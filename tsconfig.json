@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    /* Base Settings */
+    "target": "ES2024",                 // Node 24 supports almost all ES2024 features natively
+    "module": "NodeNext",               // The "floating" latest standard for Node.js
+    "moduleResolution": "NodeNext",     // Essential to match with NodeNext module
+    "lib": ["ES2024"],                  // Includes modern types like Float16Array and URLPattern
+    
+    /* Output & Structure */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    
+    /* Strictness & Safety */
+    "strict": true,
+    "skipLibCheck": true,               // Essential for speed and avoiding 3rd party type errors
+    "forceConsistentCasingInFileNames": true,
+    
+    /* Interop & Modern Features */
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
