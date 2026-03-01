@@ -1,4 +1,4 @@
-import { Document, Model, Schema, Types } from "mongoose";
+import mongoose, { Document, Model, Schema, Types } from "mongoose";
 import { Profile } from "passport-google-oauth20";
 import { z } from "zod";
 
@@ -47,7 +47,6 @@ export type UserRegistrationData = z.infer<typeof userRegistrationSchema>;
 export type UserLoginData = z.infer<typeof userLoginSchema>;
 export type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
-
 export interface IOAuthStrategy {
   provider: "google" | "facebook" | "github" | "twitter" | "linkedin";
   id: string;
@@ -57,21 +56,26 @@ export interface IOAuthStrategy {
 }
 
 export interface IUser {
-  _id: Types.ObjectId;
+  _id: string;
   email: string;
   password?: string;
+  role?: string;
   oAuthStrategies: IOAuthStrategy[];
   firstName?: string;
   lastName?: string;
   avatar?: string;
   isActive: boolean;
   isVerified: boolean;
+  lastLogin?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IUserDoc extends Document, Omit<IUser, "_id"|'lastLogin'|'createdAt'|'updatedAt'> {
+  _id: Types.ObjectId;
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface IUserDoc extends Document, IUser {
   // Instance methods
   comparePassword(candidatePassword: string): Promise<boolean>;
   generateAuthToken(): string;
@@ -87,7 +91,7 @@ export interface IUserModel<T extends IUserDoc = IUserDoc> extends Model<T> {
     tokens?: { accessToken?: string; refreshToken?: string },
   ): Promise<T>;
   createWithEmailPassword(data: EmailPasswordData): Promise<T>;
-  
+
   // Zod validation methods
   validateLoginCredentials(data: any): UserLoginData;
   validateUpdateData(data: any): UserUpdateData;
@@ -104,14 +108,7 @@ export interface AuthConfig {
     clientSecret: string;
     callbackURL: string;
   };
-  mongoose?: {
-    uri?: string;
-    options?: Record<string, any>;
-    skipConnection?: boolean; // Skip connection if already connected
-    forceReconnect?: boolean; // Force reconnection even if connected
-    onConnectionReady?: () => void | Promise<void>; // Callback when connection is ready
-    onConnectionError?: (error: Error) => void | Promise<void>; // Callback on connection error
-  };
+  mongooseConnection?: mongoose.Connection;
   hooks?: UserHooks;
   userModel?: Schema;
   hashRounds?: number;

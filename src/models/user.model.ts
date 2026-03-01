@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import {
@@ -26,6 +26,7 @@ const defaultUserSchema = new Schema<IUserDoc>(
       type: String,
       select: false,
     },
+    role:String,
     oAuthStrategies: [
       {
         provider: {
@@ -76,8 +77,9 @@ const defaultUserSchema = new Schema<IUserDoc>(
 // Enhanced function to create User model with additional fields
 export function createUserModel(
   additionalFields?: Schema,
-  modelName: string = "User",
+  options?: { modelName?: string; mongooseConnection?: mongoose.Connection },
 ): IUserModel {
+  const { modelName = "User", mongooseConnection } = options || {};
   let schema: Schema<IUserDoc>;
 
   if (additionalFields && Object.keys(additionalFields.obj).length > 0) {
@@ -95,6 +97,10 @@ export function createUserModel(
   }
 
   schema = assignMethods(schema);
+
+  if (mongooseConnection) {
+    return mongooseConnection.model<IUserDoc, IUserModel>(modelName, schema);
+  }
 
   return model<IUserDoc, IUserModel>(modelName, schema);
 }
@@ -184,7 +190,6 @@ function assignMethods(defaultUserSchema: Schema<IUserDoc>) {
   ): UserUpdateData {
     return userUpdateSchema.parse(data);
   };
-
 
   return defaultUserSchema;
 }

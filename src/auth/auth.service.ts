@@ -32,18 +32,15 @@ export class AuthService {
 
     this.authUtils = new AuthUtils(config.jwt.secret, config.jwt.expiresIn);
 
-    this.userModel = createUserModel(config.userModel);
+    this.userModel = createUserModel(config.userModel, {
+      mongooseConnection: config?.mongooseConnection,
+    });
 
     this.authStrategies = new AuthStrategies(this.userModel);
     this.authStrategies.initialize(config.google);
 
     this.authMiddleware = createAuthMiddleware(this.authUtils, this.userModel);
-
-    if (config.mongoose?.uri && !config.mongoose?.skipConnection) {
-      // this.connectToDatabase();
-    }
   }
-
 
   // Register with email and password
   async register(userData: EmailPasswordData): Promise<AuthResponse> {

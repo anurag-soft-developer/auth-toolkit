@@ -15,6 +15,24 @@ export class AuthMiddleware {
     this.userModel = userModel;
   }
 
+  private async parseUserFromRequestToken(
+    req: Request,
+  ): Promise<IUserDoc | null> {
+    const authHeader = req.headers.authorization;
+    const token = AuthUtils.extractTokenFromHeader(authHeader || "");
+    if (!token) return null;
+    try {
+      const decoded = this.authUtils.verifyToken(token);
+      const user = await this.userModel.findById(decoded.userId);
+      if (user && user.isActive) {
+        return user;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   // JWT Authentication middleware
   authenticate = async (
     req: AuthRequest,
@@ -25,26 +43,14 @@ export class AuthMiddleware {
       if (!!req.user) {
         return next();
       }
-
-      const authHeader = req.headers.authorization;
-      const token = AuthUtils.extractTokenFromHeader(authHeader || "");
-
-      if (!token) {
-        res.status(401).json({ error: "Access token required" });
+      const user = await this.parseUserFromRequestToken(req);
+      if (!user) {
+        res.status(401).json({ error: "Access token required or invalid" });
         return;
       }
-
-      const decoded = this.authUtils.verifyToken(token);
-      const user = await this.userModel.findById(decoded.userId);
-
-      if (!user || !user.isActive) {
-        res.status(401).json({ error: "Invalid or inactive user" });
-        return;
-      }
-
       req.user = user;
       next();
-    } catch (error) {
+    } catch {
       res.status(401).json({ error: "Invalid or expired token" });
     }
   };
@@ -56,45 +62,43 @@ export class AuthMiddleware {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const authHeader = req.headers.authorization;
-      const token = AuthUtils.extractTokenFromHeader(authHeader || "");
-
-      if (token) {
-        const decoded = this.authUtils.verifyToken(token);
-        const user = await this.userModel.findById(decoded.userId);
-
-        if (user && user.isActive) {
-          req.user = user;
-        }
+      if (!!req.user) {
+        return next();
       }
-
+      const user = await this.parseUserFromRequestToken(req);
+      if (user) {
+        req.user = user;
+      }
       next();
-    } catch (error) {
+    } catch {
       // Continue without authentication
       next();
     }
   };
 
   // Role-based authorization middleware
-  // authorize = (roles: string[]) => {
-  //   return (req: AuthRequest, res: Response, next: NextFunction): void => {
-  //     if (!req.user) {
-  //       res.status(401).json({ error: 'Authentication required' });
-  //       return;
-  //     }
-
-  //     // Check if user has any of the required roles
-  //     const userRoles = req.user.roles || [];
-  //     const hasPermission = roles.some(role => userRoles.includes(role));
-
-  //     if (!hasPermission) {
-  //       res.status(403).json({ error: 'Insufficient permissions' });
-  //       return;
-  //     }
-
-  //     next();
-  //   };
-  // };
+  authorizeRole = (roles: string[]) => {
+    return async (
+      req: AuthRequest,
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
+      if (!req.user) {
+        const user = await this.parseUserFromRequestToken(req);
+        if (!user) {
+          res.status(401).json({ error: "Authentication required" });
+          return;
+        }
+        req.user = user;
+      }
+      const hasPermission = roles.some((role) => req.user?.role === role);
+      if (!hasPermission) {
+        res.status(403).json({ error: "Insufficient permissions" });
+        return;
+      }
+      next();
+    };
+  };
 
   requireVerifiedEmail = (
     req: AuthRequest,
