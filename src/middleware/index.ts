@@ -1,2 +1,2 @@
 export * from './auth.middleware';
-export { default as createAuthRoutes } from './auth.routes';
+export { default as createAuthRoutes } from '../routes/auth.routes';

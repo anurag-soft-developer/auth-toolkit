@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { userRegistrationSchema, userUpdateSchema } from "../types";
+import { userRegistrationSchema } from "../types";
 
 export class ValidationUtils {
   /**
@@ -32,17 +32,6 @@ export class ValidationUtils {
     T extends Record<string, z.ZodTypeAny>,
   >(additionalFields: T) {
     return userRegistrationSchema.extend(additionalFields);
-  }
-
-  /**
-   * Create extended update schema for custom user models
-   * @param additionalFields - Additional Zod schema fields
-   * @returns Extended update schema
-   */
-  static createExtendedUpdateSchema<T extends Record<string, z.ZodTypeAny>>(
-    additionalFields: T,
-  ) {
-    return userUpdateSchema.extend(additionalFields);
   }
 }
 

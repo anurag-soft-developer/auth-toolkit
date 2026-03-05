@@ -1,33 +1,32 @@
-import mongoose, { Schema, model } from "mongoose";
+import mongoose, { Schema, SchemaDefinition, model } from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import {
   IUserDoc,
-  IUserModel,
   EmailPasswordData,
   userRegistrationSchema,
   userLoginSchema,
-  userUpdateSchema,
   UserLoginData,
-  UserUpdateData,
+  IUserModel,
 } from "../types";
 import { Profile } from "passport-google-oauth20";
 
-const defaultUserSchema = new Schema<IUserDoc>(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-    password: {
-      type: String,
-      select: false,
-    },
-    role:String,
-    oAuthStrategies: [
+const schemaObj: SchemaDefinition<IUserDoc> = {
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    index: true,
+  },
+  password: {
+    type: String,
+    select: false,
+  },
+  role: String,
+  oAuthStrategies: {
+    type: [
       {
         provider: {
           type: String,
@@ -46,73 +45,85 @@ const defaultUserSchema = new Schema<IUserDoc>(
         },
       },
     ],
-    firstName: {
-      type: String,
-      trim: true,
-    },
-    lastName: {
-      type: String,
-      trim: true,
-    },
-    avatar: {
-      type: String,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
-    lastLogin: {
-      type: Date,
-    },
+    select: false,
   },
-  {
-    timestamps: true,
+  fullName: {
+    type: String,
+    trim: true,
   },
-);
+
+  avatar: {
+    type: String,
+  },
+  bio: String,
+  phone: String,
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  otp: {
+    type: String,
+    select: false,
+  },
+  lastLogin: {
+    type: Date,
+  },
+};
 
 // Enhanced function to create User model with additional fields
-export function createUserModel(
-  additionalFields?: Schema,
+export function createUserModel<T extends SchemaDefinition>(
+  additionalFields?: T,
   options?: { modelName?: string; mongooseConnection?: mongoose.Connection },
-): IUserModel {
+) {
   const { modelName = "User", mongooseConnection } = options || {};
-  let schema: Schema<IUserDoc>;
+  type DataType = mongoose.InferRawDocType<T> & IUserDoc;
+  const conflictingFields = Object.keys(additionalFields || {}).filter((key) =>
+    Object.keys(schemaObj).includes(key),
+  );
 
-  if (additionalFields && Object.keys(additionalFields.obj).length > 0) {
-    schema = new Schema<IUserDoc>(
+  if (conflictingFields.length > 0) {
+    throw new Error(
+      `Additional fields conflict with existing schema fields: ${conflictingFields.join(
+        ", ",
+      )}`,
+    );
+  }
+
+  const schema = assignMethods(
+    new Schema<DataType>(
       {
-        ...defaultUserSchema.obj,
-        ...additionalFields.obj,
+        ...additionalFields,
+        ...schemaObj,
       },
       {
         timestamps: true,
       },
-    );
-  } else {
-    schema = defaultUserSchema;
-  }
-
-  schema = assignMethods(schema);
+    ),
+  );
 
   if (mongooseConnection) {
-    return mongooseConnection.model<IUserDoc, IUserModel>(modelName, schema);
+    return mongooseConnection.model<DataType>(
+      modelName,
+      schema,
+    ) as IUserModel<DataType>;
   }
 
-  return model<IUserDoc, IUserModel>(modelName, schema);
+  return model<DataType>(modelName, schema) as IUserModel<DataType>;
 }
 
-function assignMethods(defaultUserSchema: Schema<IUserDoc>) {
+function assignMethods<T extends Schema>(defaultUserSchema: T): T {
   // Pre-save middleware to hash password
   defaultUserSchema.pre("save", async function (this) {
-    if (!this.isModified("password") || !this.password) return;
+    if (!this.isModified("password") || typeof this.password !== "string")
+      return;
 
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -165,8 +176,7 @@ function assignMethods(defaultUserSchema: Schema<IUserDoc>) {
           refreshToken: tokens?.refreshToken,
         },
       ],
-      firstName: profile.name?.givenName,
-      lastName: profile.name?.familyName,
+      fullName: profile.displayName,
       avatar: profile.photos?.[0]?.value,
       isEmailVerified: profile.emails?.[0]?.verified || false,
     };
@@ -186,13 +196,6 @@ function assignMethods(defaultUserSchema: Schema<IUserDoc>) {
     data: any,
   ): UserLoginData {
     return userLoginSchema.parse(data);
-  };
-
-  // Static method to validate user update data
-  defaultUserSchema.statics.validateUpdateData = function (
-    data: any,
-  ): UserUpdateData {
-    return userUpdateSchema.parse(data);
   };
 
   return defaultUserSchema;

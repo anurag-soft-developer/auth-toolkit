@@ -1,4 +1,4 @@
-import mongoose, { Document, Model, Schema, Types } from "mongoose";
+import mongoose, { Document, Model, Schema, SchemaDefinition, Types } from "mongoose";
 import { Profile } from "passport-google-oauth20";
 import { z } from "zod";
 
@@ -14,15 +14,14 @@ export const nameSchema = z
   .string()
   .trim()
   .min(1, "Name cannot be empty")
-  .max(50, "Name too long")
+  .max(100, "Name too long")
   .optional();
 
 export const userRegistrationSchema = z
   .object({
     email: emailSchema,
     password: passwordSchema,
-    firstName: nameSchema,
-    lastName: nameSchema,
+    fullName: nameSchema,
   })
   .strict();
 
@@ -33,19 +32,9 @@ export const userLoginSchema = z
   })
   .strict();
 
-export const userUpdateSchema = z
-  .object({
-    firstName: nameSchema,
-    lastName: nameSchema,
-    avatar: z.string().url("Invalid avatar URL").optional(),
-    isActive: z.boolean().optional(),
-  })
-  .strict()
-  .partial();
 
 export type UserRegistrationData = z.infer<typeof userRegistrationSchema>;
 export type UserLoginData = z.infer<typeof userLoginSchema>;
-export type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
 export interface IOAuthStrategy {
   provider: "google" | "facebook" | "github" | "twitter" | "linkedin";
@@ -61,18 +50,23 @@ export interface IUser {
   password?: string;
   role?: string;
   oAuthStrategies: IOAuthStrategy[];
-  firstName?: string;
-  lastName?: string;
+  fullName?: string;
   avatar?: string;
   isActive: boolean;
   isVerified: boolean;
   isEmailVerified: boolean;
+  otp?: string;
+  bio?: string;
+  phone?: string;
   lastLogin?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface IUserDoc extends Document, Omit<IUser, "_id"|'lastLogin'|'createdAt'|'updatedAt'> {
+export interface IUserDoc
+  extends
+    Document,
+    Omit<IUser, "_id" | "lastLogin" | "createdAt" | "updatedAt"> {
   _id: Types.ObjectId;
   lastLogin?: Date;
   createdAt: Date;
@@ -95,7 +89,6 @@ export interface IUserModel<T extends IUserDoc = IUserDoc> extends Model<T> {
 
   // Zod validation methods
   validateLoginCredentials(data: any): UserLoginData;
-  validateUpdateData(data: any): UserUpdateData;
 }
 
 // Authentication Configuration
@@ -111,7 +104,7 @@ export interface AuthConfig {
   };
   mongooseConnection?: mongoose.Connection;
   hooks?: UserHooks;
-  userModel?: Schema;
+  userModel?: SchemaDefinition;
   hashRounds?: number;
 }
 
